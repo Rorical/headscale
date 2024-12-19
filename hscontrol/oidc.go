@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	randomByteSize = 16
+	randomByteSize           = 16
+	defaultOAuthOptionsCount = 3
 )
 
 var (
@@ -169,7 +170,7 @@ func (a *AuthProviderOIDC) RegisterHandler(
 		MachineKey: machineKey,
 	}
 
-	extras := make([]oauth2.AuthCodeOption, 0, len(a.cfg.ExtraParams)+3)
+	extras := make([]oauth2.AuthCodeOption, 0, len(a.cfg.ExtraParams)+defaultOAuthOptionsCount)
 	// Add PKCE verification if enabled
 	if a.cfg.PKCE.Enabled {
 		verifier := oauth2.GenerateVerifier()

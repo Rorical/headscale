@@ -35,9 +35,13 @@ const (
 	dockerContextPath      = "../."
 	hsicOIDCMockHashLength = 6
 	defaultAccessTTL       = 10 * time.Minute
+	nodeStateRunning       = "Running"
 )
 
-var errStatusCodeNotOK = errors.New("status code not OK")
+var (
+	errStatusCodeNotOK = errors.New("status code not OK")
+	ErrOIDCClientCount = errors.New("client count must be 1 for OIDC scenario")
+)
 
 type AuthOIDCScenario struct {
 	*Scenario
@@ -618,7 +622,7 @@ func TestOIDCAuthenticationWithPKCE(t *testing.T) {
 	for _, client := range allClients {
 		status, err := client.Status()
 		assertNoErr(t, err)
-		if status.BackendState != "Running" {
+		if status.BackendState != nodeStateRunning {
 			t.Errorf("client %s is not running: %s", client.Hostname(), status.BackendState)
 		}
 	}
@@ -670,9 +674,11 @@ func (t *tamperVerifierTransport) RoundTrip(req *http.Request) (*http.Response, 
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {
 		log.Printf("RoundTrip error: %v", err)
+
 		return nil, err
 	}
 	log.Printf("Response status: %s", resp.Status)
+
 	return resp, err
 }
 
@@ -713,13 +719,14 @@ func TestOIDCAuthenticationWithPKCEVerifierTampering(t *testing.T) {
 
 	// Create a transport that modifies the PKCE verifier in transit
 	baseTransport := &http.Transport{
+		// #nosec G402 -- This is a test-only code using mock OIDC server with self-signed certificates
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	tamperTransport := &tamperVerifierTransport{
 		base: baseTransport,
 	}
 
-	err = scenario.CreateHeadscaleEnvWithHttpModifier(
+	err = scenario.CreateHeadscaleEnvWithHTTPModifier(
 		spec,
 		func(cli *http.Client) {
 			cli.Transport = tamperTransport
@@ -757,7 +764,7 @@ func (s *AuthOIDCScenario) CreateHeadscaleEnv(
 			// This is because the MockOIDC server can only serve login
 			// requests based on a queue it has been given on startup.
 			// We currently only populates it with one login request per user.
-			return fmt.Errorf("client count must be 1 for OIDC scenario.")
+			return ErrOIDCClientCount
 		}
 		log.Printf("creating user %s with %d clients", userName, clientCount)
 		err = s.CreateUser(userName)
@@ -779,7 +786,7 @@ func (s *AuthOIDCScenario) CreateHeadscaleEnv(
 	return nil
 }
 
-func (s *AuthOIDCScenario) CreateHeadscaleEnvWithHttpModifier(
+func (s *AuthOIDCScenario) CreateHeadscaleEnvWithHTTPModifier(
 	users map[string]int,
 	httpModifier func(*http.Client),
 	opts ...hsic.Option,
@@ -800,7 +807,7 @@ func (s *AuthOIDCScenario) CreateHeadscaleEnvWithHttpModifier(
 			// This is because the MockOIDC server can only serve login
 			// requests based on a queue it has been given on startup.
 			// We currently only populates it with one login request per user.
-			return fmt.Errorf("client count must be 1 for OIDC scenario.")
+			return ErrOIDCClientCount
 		}
 		log.Printf("creating user %s with %d clients", userName, clientCount)
 		err = s.CreateUser(userName)
@@ -931,7 +938,7 @@ func (s *AuthOIDCScenario) runTailscaleUp(
 					log.Printf("%s failed to run tailscale up: %s", c.Hostname(), err)
 				}
 
-				loginURL.Host = fmt.Sprintf("%s:8080", headscale.GetIP())
+				loginURL.Host = headscale.GetIP() + ":8080"
 				loginURL.Scheme = "http"
 
 				if len(headscale.GetCert()) > 0 {
@@ -939,6 +946,7 @@ func (s *AuthOIDCScenario) runTailscaleUp(
 				}
 
 				insecureTransport := &http.Transport{
+					// #nosec G402 -- This is a test-only code using mock OIDC server with self-signed certificates
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // nolint
 				}
 
@@ -1026,7 +1034,7 @@ func (s *AuthOIDCScenario) runTailscaleUpWithModifier(
 					return err
 				}
 
-				if status.BackendState == "Running" {
+				if status.BackendState == nodeStateRunning {
 					log.Printf("%s is already running", c.Hostname())
 					return nil
 				}
@@ -1039,7 +1047,7 @@ func (s *AuthOIDCScenario) runTailscaleUpWithModifier(
 					return err
 				}
 
-				loginURL.Host = fmt.Sprintf("%s:8080", headscale.GetIP())
+				loginURL.Host = headscale.GetIP() + ":8080"
 				loginURL.Scheme = "http"
 
 				if len(headscale.GetCert()) > 0 {
@@ -1047,6 +1055,7 @@ func (s *AuthOIDCScenario) runTailscaleUpWithModifier(
 				}
 
 				insecureTransport := &http.Transport{
+					// #nosec G402 -- This is a test-only code using mock OIDC server with self-signed certificates
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // nolint
 				}
 
