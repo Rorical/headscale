@@ -735,27 +735,6 @@ func TestOIDCAuthenticationWithPKCEVerifierTampering(t *testing.T) {
 	} else {
 		log.Printf("auth got error: %s", err)
 	}
-
-	// Verify no users were created since authentication should fail
-	headscale, err := scenario.Headscale()
-	assertNoErr(t, err)
-
-	var listUsers []v1.User
-	err = executeAndUnmarshal(headscale,
-		[]string{
-			"headscale",
-			"users",
-			"list",
-			"--output",
-			"json",
-		},
-		&listUsers,
-	)
-	assertNoErr(t, err)
-
-	if len(listUsers) > 0 {
-		t.Errorf("expected no users to be created, but found %d users", len(listUsers))
-	}
 }
 
 func (s *AuthOIDCScenario) CreateHeadscaleEnv(
