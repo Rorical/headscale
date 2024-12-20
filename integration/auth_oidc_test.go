@@ -1098,6 +1098,7 @@ func (s *AuthOIDCScenario) runTailscaleUpWithModifier(
 				return err
 			}
 		}
+
 		return nil
 	}
 
